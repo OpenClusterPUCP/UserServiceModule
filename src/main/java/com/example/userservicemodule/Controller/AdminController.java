@@ -2,6 +2,7 @@ package com.example.userservicemodule.Controller;
 
 import com.example.userservicemodule.Entity.User;
 import com.example.userservicemodule.Repository.UserRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.ws.rs.core.Link;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
@@ -11,6 +12,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -59,10 +61,14 @@ public class AdminController {
                 listaContent.add(userContent);
             }
 
+            ObjectMapper objectMapper = new ObjectMapper();
+            String responseBody = objectMapper.writeValueAsString(listaContent);
             return ResponseEntity
                     .status(HttpStatus.OK)
                     .header("X-Total-Count", String.valueOf(listaContent.size()))
-                    .body(listaContent);
+                    .header("Content-Type", "application/json")
+                    .header("Content-Length", String.valueOf(responseBody.getBytes(StandardCharsets.UTF_8).length))
+                    .body(responseBody);
 
         } catch (DataAccessException ex) {
             // Handle database access errors
