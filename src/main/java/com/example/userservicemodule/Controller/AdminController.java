@@ -22,7 +22,7 @@ import java.util.*;
 public class AdminController {
 
 
-    
+
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
