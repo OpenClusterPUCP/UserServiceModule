@@ -3,7 +3,7 @@ package com.example.userservicemodule.Entity;
 import jakarta.persistence.*;
 
 @Entity
-@Table(name = "resources", schema = "cloud")
+@Table(name = "resources", schema = "cloud_v3")
 public class Resource {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
