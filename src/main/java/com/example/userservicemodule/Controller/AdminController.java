@@ -20,25 +20,24 @@ import java.util.*;
 @RestController
 @RequestMapping("/Admin")
 public class AdminController {
-
-
-
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
 
-
-
     public AdminController(UserRepository userRepository,
-                           RoleRepository roleRepository, PasswordEncoder passwordEncoder) {
+                           RoleRepository roleRepository,
+                           PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
         this.passwordEncoder = passwordEncoder;
     }
 
+    /**
+     * Obtiene todos los usuarios
+     */
     @GetMapping("/users")
     @ResponseBody
-    public ResponseEntity<?> getUsersInfo() {
+    public ResponseEntity<?> getAllUsers() {
         try {
             // Check if repository is available
             if (userRepository == null) {
@@ -67,6 +66,7 @@ public class AdminController {
                 userContent.put("username", user.getUsername());
                 userContent.put("role", user.getRole().getName());
                 userContent.put("code", user.getCode());
+                userContent.put("state", user.getState()); // Asegúrate de incluir el estado
                 listaContent.add(userContent);
             }
 
@@ -93,6 +93,38 @@ public class AdminController {
                     .header("X-Error-Type", "UnexpectedError")
                     .header("X-Error-Message", ex.getMessage())
                     .body("An unexpected error occurred");
+        }
+    }
+
+    /**
+     * Obtiene un usuario por su ID
+     */
+    @GetMapping("/user/{id}")
+    public ResponseEntity<?> getUserById(@PathVariable Integer id) {
+        try {
+            User user = userRepository.findById(id)
+                    .orElseThrow(() -> new NoSuchElementException("Usuario no encontrado con ID: " + id));
+
+            // Crear respuesta
+            Map<String, Object> response = new HashMap<>();
+            response.put("id", user.getId());
+            response.put("username", user.getUsername());
+            response.put("name", user.getName());
+            response.put("lastname", user.getLastname());
+            response.put("code", user.getCode());
+            response.put("role", user.getRole().getName());
+            response.put("roleId", user.getRole().getId());
+            response.put("state", user.getState());
+
+            return ResponseEntity.ok(response);
+        } catch (NoSuchElementException e) {
+            return ResponseEntity
+                    .status(HttpStatus.NOT_FOUND)
+                    .body("Usuario no encontrado: " + e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity
+                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error al obtener información del usuario: " + e.getMessage());
         }
     }
 
@@ -157,6 +189,80 @@ public class AdminController {
         }
     }
 
+    /**
+     * Actualiza un usuario existente
+     */
+    @PutMapping("/updateUser/{id}")
+    public ResponseEntity<?> updateUser(@PathVariable Integer id, @RequestBody Map<String, Object> userData) {
+        try {
+            User user = userRepository.findById(id)
+                    .orElseThrow(() -> new NoSuchElementException("Usuario no encontrado con ID: " + id));
+
+            // Actualizar datos del usuario (solo los campos que vienen en la petición)
+            if (userData.containsKey("name")) {
+                user.setName((String) userData.get("name"));
+            }
+
+            if (userData.containsKey("lastname")) {
+                user.setLastname((String) userData.get("lastname"));
+            }
+
+            if (userData.containsKey("code")) {
+                user.setCode((String) userData.get("code"));
+            }
+
+            if (userData.containsKey("username")) {
+                String newUsername = (String) userData.get("username");
+                if (!newUsername.equals(user.getUsername()) &&
+                        userRepository.findByUsername(newUsername).isPresent()) {
+                    return ResponseEntity
+                            .status(HttpStatus.CONFLICT)
+                            .body("El nombre de usuario ya existe");
+                }
+                user.setUsername(newUsername);
+            }
+
+            if (userData.containsKey("password")) {
+                user.setPassword(passwordEncoder.encode((String) userData.get("password")));
+            }
+
+            if (userData.containsKey("role")) {
+                Map<String, Object> roleData = (Map<String, Object>) userData.get("role");
+                Integer roleId = (Integer) roleData.get("id");
+                Role role = roleRepository.findById(roleId)
+                        .orElseThrow(() -> new IllegalArgumentException("Rol no encontrado con ID: " + roleId));
+                user.setRole(role);
+            }
+
+            // Guardar cambios
+            User updatedUser = userRepository.save(user);
+
+            // Crear respuesta
+            Map<String, Object> response = new HashMap<>();
+            response.put("id", updatedUser.getId());
+            response.put("username", updatedUser.getUsername());
+            response.put("name", updatedUser.getName());
+            response.put("lastname", updatedUser.getLastname());
+            response.put("code", updatedUser.getCode());
+            response.put("role", updatedUser.getRole().getName());
+            response.put("state", updatedUser.getState());
+            response.put("message", "Usuario actualizado exitosamente");
+
+            return ResponseEntity.ok(response);
+        } catch (NoSuchElementException e) {
+            return ResponseEntity
+                    .status(HttpStatus.NOT_FOUND)
+                    .body("Usuario no encontrado: " + e.getMessage());
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity
+                    .status(HttpStatus.BAD_REQUEST)
+                    .body(e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity
+                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error al actualizar usuario: " + e.getMessage());
+        }
+    }
 
     /**
      * Elimina un usuario (borrado físico)
@@ -187,24 +293,23 @@ public class AdminController {
     }
 
     /**
-     * Obtiene información detallada de un usuario específico
+     * Banea a un usuario
      */
-    @GetMapping("/user/{id}")
-    public ResponseEntity<?> getUserById(@PathVariable Integer id) {
+    @PutMapping("/banUser/{id}")
+    public ResponseEntity<?> banUser(@PathVariable Integer id) {
         try {
             User user = userRepository.findById(id)
                     .orElseThrow(() -> new NoSuchElementException("Usuario no encontrado con ID: " + id));
 
-            // Crear respuesta
+            // Cambiar estado a "baneado" (0)
+            user.setState("0");
+            User updatedUser = userRepository.save(user);
+
             Map<String, Object> response = new HashMap<>();
-            response.put("id", user.getId());
-            response.put("username", user.getUsername());
-            response.put("name", user.getName());
-            response.put("lastname", user.getLastname());
-            response.put("code", user.getCode());
-            response.put("role", user.getRole().getName());
-            response.put("roleId", user.getRole().getId());
-            response.put("state", user.getState());
+            response.put("id", updatedUser.getId());
+            response.put("username", updatedUser.getUsername());
+            response.put("state", updatedUser.getState());
+            response.put("message", "Usuario baneado exitosamente");
 
             return ResponseEntity.ok(response);
         } catch (NoSuchElementException e) {
@@ -214,8 +319,84 @@ public class AdminController {
         } catch (Exception e) {
             return ResponseEntity
                     .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("Error al obtener información del usuario: " + e.getMessage());
+                    .body("Error al banear usuario: " + e.getMessage());
         }
     }
 
+    /**
+     * Desbanea a un usuario
+     */
+    @PutMapping("/unbanUser/{id}")
+    public ResponseEntity<?> unbanUser(@PathVariable Integer id) {
+        try {
+            User user = userRepository.findById(id)
+                    .orElseThrow(() -> new NoSuchElementException("Usuario no encontrado con ID: " + id));
+
+            // Cambiar estado a "activo" (1)
+            user.setState("1");
+            User updatedUser = userRepository.save(user);
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("id", updatedUser.getId());
+            response.put("username", updatedUser.getUsername());
+            response.put("state", updatedUser.getState());
+            response.put("message", "Usuario desbaneado exitosamente");
+
+            return ResponseEntity.ok(response);
+        } catch (NoSuchElementException e) {
+            return ResponseEntity
+                    .status(HttpStatus.NOT_FOUND)
+                    .body("Usuario no encontrado: " + e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity
+                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error al desbanear usuario: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Obtiene usuarios por rol
+     */
+    @GetMapping("/getUsersByRole/{roleId}")
+    public ResponseEntity<?> getUsersByRole(@PathVariable Integer roleId) {
+        try {
+            // Verificar si el rol existe
+            Role role = roleRepository.findById(roleId)
+                    .orElseThrow(() -> new NoSuchElementException("Rol no encontrado con ID: " + roleId));
+
+            // Buscar usuarios por rol
+            List<User> users = userRepository.findByRole(role);
+
+            if (users.isEmpty()) {
+                return ResponseEntity
+                        .status(HttpStatus.NO_CONTENT)
+                        .header("X-Info", "No se encontraron usuarios con el rol especificado")
+                        .build();
+            }
+
+            // Preparar respuesta
+            ArrayList<LinkedHashMap<String, Object>> listaContent = new ArrayList<>();
+            for (User user : users) {
+                LinkedHashMap<String, Object> userContent = new LinkedHashMap<>();
+                userContent.put("id", user.getId());
+                userContent.put("name", user.getName());
+                userContent.put("lastname", user.getLastname());
+                userContent.put("username", user.getUsername());
+                userContent.put("role", user.getRole().getName());
+                userContent.put("code", user.getCode());
+                userContent.put("state", user.getState());
+                listaContent.add(userContent);
+            }
+
+            return ResponseEntity.ok(listaContent);
+        } catch (NoSuchElementException e) {
+            return ResponseEntity
+                    .status(HttpStatus.NOT_FOUND)
+                    .body("Rol no encontrado: " + e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity
+                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error al obtener usuarios por rol: " + e.getMessage());
+        }
+    }
 }
