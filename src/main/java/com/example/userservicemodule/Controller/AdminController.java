@@ -6,6 +6,7 @@ import com.example.userservicemodule.Repository.RoleRepository;
 import com.example.userservicemodule.Repository.UserRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.ws.rs.core.Link;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
@@ -15,10 +16,17 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
 import java.nio.charset.StandardCharsets;
+import java.security.SecureRandom;
 import java.util.*;
 
+
+/**
+ * Controlador REST para operaciones de administración de usuarios.
+ * Proporciona endpoints para la gestión completa de usuarios en el sistema.
+ */
 @RestController
 @RequestMapping("/Admin")
+@Slf4j
 public class AdminController {
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
@@ -33,14 +41,18 @@ public class AdminController {
     }
 
     /**
-     * Obtiene todos los usuarios
+     * Obtiene todos los usuarios del sistema.
+     *
+     * @return Lista de usuarios con sus datos básicos
      */
     @GetMapping("/users")
     @ResponseBody
     public ResponseEntity<?> getAllUsers() {
         try {
+            log.info("Solicitando lista de todos los usuarios");
             // Check if repository is available
             if (userRepository == null) {
+                log.error("Repositorio de usuarios no disponible");
                 return ResponseEntity
                         .status(HttpStatus.INTERNAL_SERVER_ERROR)
                         .header("X-Error-Type", "RepositoryUnavailable")
@@ -50,6 +62,7 @@ public class AdminController {
             // Get all users and handle empty result
             List<User> users = userRepository.findAll();
             if (users.isEmpty()) {
+                log.warn("No se encontraron usuarios en la base de datos");
                 return ResponseEntity
                         .status(HttpStatus.NO_CONTENT)
                         .header("X-Info", "No users found in the database")
@@ -66,10 +79,11 @@ public class AdminController {
                 userContent.put("username", user.getUsername());
                 userContent.put("role", user.getRole().getName());
                 userContent.put("code", user.getCode());
-                userContent.put("state", user.getState()); // Asegúrate de incluir el estado
+                userContent.put("state", user.getState());
                 listaContent.add(userContent);
             }
 
+            log.debug("Se recuperaron {} usuarios", users.size());
             ObjectMapper objectMapper = new ObjectMapper();
             String responseBody = objectMapper.writeValueAsString(listaContent);
             return ResponseEntity
@@ -81,6 +95,7 @@ public class AdminController {
 
         } catch (DataAccessException ex) {
             // Handle database access errors
+            log.error("Error de acceso a la base de datos: {}", ex.getMessage(), ex);
             return ResponseEntity
                     .status(HttpStatus.SERVICE_UNAVAILABLE)
                     .header("X-Error-Type", "DatabaseError")
@@ -88,6 +103,7 @@ public class AdminController {
                     .body("Database access error occurred");
         } catch (Exception ex) {
             // Handle all other unexpected errors
+            log.error("Error inesperado al obtener usuarios: {}", ex.getMessage(), ex);
             return ResponseEntity
                     .status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .header("X-Error-Type", "UnexpectedError")
@@ -97,11 +113,15 @@ public class AdminController {
     }
 
     /**
-     * Obtiene un usuario por su ID
+     * Obtiene un usuario por su ID.
+     *
+     * @param id ID del usuario a consultar
+     * @return Datos detallados del usuario solicitado
      */
     @GetMapping("/user/{id}")
     public ResponseEntity<?> getUserById(@PathVariable Integer id) {
         try {
+            log.info("Solicitando información del usuario ID: {}", id);
             User user = userRepository.findById(id)
                     .orElseThrow(() -> new NoSuchElementException("Usuario no encontrado con ID: " + id));
 
@@ -116,12 +136,15 @@ public class AdminController {
             response.put("roleId", user.getRole().getId());
             response.put("state", user.getState());
 
+            log.debug("Usuario ID {} recuperado: {}", id, user.getUsername());
             return ResponseEntity.ok(response);
         } catch (NoSuchElementException e) {
+            log.warn("Usuario no encontrado: ID {}", id);
             return ResponseEntity
                     .status(HttpStatus.NOT_FOUND)
                     .body("Usuario no encontrado: " + e.getMessage());
         } catch (Exception e) {
+            log.error("Error al obtener información del usuario ID {}: {}", id, e.getMessage(), e);
             return ResponseEntity
                     .status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Error al obtener información del usuario: " + e.getMessage());
@@ -129,15 +152,26 @@ public class AdminController {
     }
 
     /**
-     * Crea un nuevo usuario
+     * Crea un nuevo usuario en el sistema.
+     *
+     * @param userData Datos del nuevo usuario
+     * @return Datos del usuario creado
      */
     @PostMapping("/createUser")
     public ResponseEntity<?> createUser(@RequestBody Map<String, Object> userData) {
         try {
+            log.info("Creando nuevo usuario: {}", userData.get("username"));
+
+            // Verificar si se debe generar una contraseña automáticamente
+            boolean generatePassword = userData.containsKey("generatePassword") &&
+                    Boolean.TRUE.equals(userData.get("generatePassword"));
+
             // Validar datos requeridos
-            if (!userData.containsKey("username") || !userData.containsKey("password") ||
+            if (!userData.containsKey("username") ||
+                    (!generatePassword && !userData.containsKey("password")) ||
                     !userData.containsKey("name") || !userData.containsKey("lastname") ||
                     !userData.containsKey("code") || !userData.containsKey("role")) {
+                log.warn("Intento de creación de usuario con datos incompletos");
                 return ResponseEntity
                         .status(HttpStatus.BAD_REQUEST)
                         .body("Datos de usuario incompletos");
@@ -146,6 +180,7 @@ public class AdminController {
             // Verificar si el usuario ya existe
             String username = (String) userData.get("username");
             if (userRepository.findByUsername(username).isPresent()) {
+                log.warn("Intento de creación de usuario con nombre de usuario existente: {}", username);
                 return ResponseEntity
                         .status(HttpStatus.CONFLICT)
                         .body("El nombre de usuario ya existe");
@@ -160,7 +195,18 @@ public class AdminController {
             // Crear el nuevo usuario
             User newUser = new User();
             newUser.setUsername((String) userData.get("username"));
-            newUser.setPassword(passwordEncoder.encode((String) userData.get("password")));
+
+            // Generar contraseña si es necesario
+            String password;
+            if (generatePassword) {
+                password = generateSecurePassword(12);
+                log.info("CONTRASEÑA GENERADA para usuario {}: {}", username, password);
+                userData.put("password", password); // Actualizar en userData para incluirla en la respuesta
+            } else {
+                password = (String) userData.get("password");
+            }
+
+            newUser.setPassword(passwordEncoder.encode(password));
             newUser.setName((String) userData.get("name"));
             newUser.setLastname((String) userData.get("lastname"));
             newUser.setCode((String) userData.get("code"));
@@ -169,6 +215,7 @@ public class AdminController {
 
             // Guardar el usuario
             User savedUser = userRepository.save(newUser);
+            log.info("Usuario creado exitosamente: ID {} - {}", savedUser.getId(), savedUser.getUsername());
 
             // Crear respuesta
             Map<String, Object> response = new HashMap<>();
@@ -181,8 +228,19 @@ public class AdminController {
             response.put("state", savedUser.getState());
             response.put("message", "Usuario creado exitosamente");
 
+            // Solo incluir la contraseña generada en la respuesta si se generó automáticamente
+            if (generatePassword) {
+                response.put("generatedPassword", password);
+            }
+
             return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        } catch (IllegalArgumentException e) {
+            log.warn("Error de argumentos al crear usuario: {}", e.getMessage());
+            return ResponseEntity
+                    .status(HttpStatus.BAD_REQUEST)
+                    .body("Error en los datos proporcionados: " + e.getMessage());
         } catch (Exception e) {
+            log.error("Error al crear usuario: {}", e.getMessage(), e);
             return ResponseEntity
                     .status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Error al crear usuario: " + e.getMessage());
@@ -190,40 +248,91 @@ public class AdminController {
     }
 
     /**
-     * Actualiza un usuario existente
+     * Genera una contraseña aleatoria segura
+     * @param length Longitud de la contraseña
+     * @return Contraseña generada
+     */
+    private String generateSecurePassword(int length) {
+        // Caracteres permitidos
+        String upperCase = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        String lowerCase = "abcdefghijklmnopqrstuvwxyz";
+        String numbers = "0123456789";
+        String specialChars = "!@#$%^&*()_-+=<>?";
+        String allChars = upperCase + lowerCase + numbers + specialChars;
+
+        SecureRandom random = new SecureRandom();
+        StringBuilder password = new StringBuilder();
+
+        // Asegurar al menos un carácter de cada tipo
+        password.append(upperCase.charAt(random.nextInt(upperCase.length())));
+        password.append(lowerCase.charAt(random.nextInt(lowerCase.length())));
+        password.append(numbers.charAt(random.nextInt(numbers.length())));
+        password.append(specialChars.charAt(random.nextInt(specialChars.length())));
+
+        // Completar el resto de la contraseña
+        for (int i = 4; i < length; i++) {
+            password.append(allChars.charAt(random.nextInt(allChars.length())));
+        }
+
+        // Mezclar los caracteres
+        char[] passwordArray = password.toString().toCharArray();
+        for (int i = 0; i < passwordArray.length; i++) {
+            int j = random.nextInt(passwordArray.length);
+            char temp = passwordArray[i];
+            passwordArray[i] = passwordArray[j];
+            passwordArray[j] = temp;
+        }
+
+        return new String(passwordArray);
+    }
+
+
+    /**
+     * Actualiza un usuario existente.
+     *
+     * @param id ID del usuario a actualizar
+     * @param userData Nuevos datos del usuario
+     * @return Resultado de la actualización
      */
     @PutMapping("/updateUser/{id}")
     public ResponseEntity<?> updateUser(@PathVariable Integer id, @RequestBody Map<String, Object> userData) {
         try {
+            log.info("Actualizando usuario ID: {}", id);
             User user = userRepository.findById(id)
                     .orElseThrow(() -> new NoSuchElementException("Usuario no encontrado con ID: " + id));
 
             // Actualizar datos del usuario (solo los campos que vienen en la petición)
             if (userData.containsKey("name")) {
                 user.setName((String) userData.get("name"));
+                log.debug("Actualizando nombre de usuario ID {}: {}", id, userData.get("name"));
             }
 
             if (userData.containsKey("lastname")) {
                 user.setLastname((String) userData.get("lastname"));
+                log.debug("Actualizando apellido de usuario ID {}: {}", id, userData.get("lastname"));
             }
 
             if (userData.containsKey("code")) {
                 user.setCode((String) userData.get("code"));
+                log.debug("Actualizando código de usuario ID {}: {}", id, userData.get("code"));
             }
 
             if (userData.containsKey("username")) {
                 String newUsername = (String) userData.get("username");
                 if (!newUsername.equals(user.getUsername()) &&
                         userRepository.findByUsername(newUsername).isPresent()) {
+                    log.warn("Intento de actualizar usuario ID {} con nombre de usuario existente: {}", id, newUsername);
                     return ResponseEntity
                             .status(HttpStatus.CONFLICT)
                             .body("El nombre de usuario ya existe");
                 }
                 user.setUsername(newUsername);
+                log.debug("Actualizando nombre de usuario ID {}: {}", id, newUsername);
             }
 
             if (userData.containsKey("password")) {
                 user.setPassword(passwordEncoder.encode((String) userData.get("password")));
+                log.debug("Actualizando contraseña de usuario ID {}", id);
             }
 
             if (userData.containsKey("role")) {
@@ -232,10 +341,17 @@ public class AdminController {
                 Role role = roleRepository.findById(roleId)
                         .orElseThrow(() -> new IllegalArgumentException("Rol no encontrado con ID: " + roleId));
                 user.setRole(role);
+                log.debug("Actualizando rol de usuario ID {} a: {}", id, role.getName());
+            }
+
+            if (userData.containsKey("state")) {
+                user.setState((String) userData.get("state"));
+                log.debug("Actualizando estado de usuario ID {} a: {}", id, userData.get("state"));
             }
 
             // Guardar cambios
             User updatedUser = userRepository.save(user);
+            log.info("Usuario ID {} actualizado exitosamente", id);
 
             // Crear respuesta
             Map<String, Object> response = new HashMap<>();
@@ -250,14 +366,17 @@ public class AdminController {
 
             return ResponseEntity.ok(response);
         } catch (NoSuchElementException e) {
+            log.warn("Usuario no encontrado al intentar actualizar: ID {}", id);
             return ResponseEntity
                     .status(HttpStatus.NOT_FOUND)
                     .body("Usuario no encontrado: " + e.getMessage());
         } catch (IllegalArgumentException e) {
+            log.warn("Error de argumentos al actualizar usuario ID {}: {}", id, e.getMessage());
             return ResponseEntity
                     .status(HttpStatus.BAD_REQUEST)
                     .body(e.getMessage());
         } catch (Exception e) {
+            log.error("Error al actualizar usuario ID {}: {}", id, e.getMessage(), e);
             return ResponseEntity
                     .status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Error al actualizar usuario: " + e.getMessage());
@@ -265,16 +384,21 @@ public class AdminController {
     }
 
     /**
-     * Elimina un usuario (borrado físico)
+     * Elimina un usuario del sistema (borrado físico).
+     *
+     * @param id ID del usuario a eliminar
+     * @return Confirmación de la eliminación
      */
     @DeleteMapping("/deleteUser/{id}")
     public ResponseEntity<?> deleteUser(@PathVariable Integer id) {
         try {
+            log.info("Eliminando usuario ID: {}", id);
             User user = userRepository.findById(id)
                     .orElseThrow(() -> new NoSuchElementException("Usuario no encontrado con ID: " + id));
 
             // Eliminar usuario
             userRepository.delete(user);
+            log.info("Usuario ID {} eliminado exitosamente", id);
 
             Map<String, Object> response = new HashMap<>();
             response.put("id", id);
@@ -282,10 +406,12 @@ public class AdminController {
 
             return ResponseEntity.ok(response);
         } catch (NoSuchElementException e) {
+            log.warn("Usuario no encontrado al intentar eliminar: ID {}", id);
             return ResponseEntity
                     .status(HttpStatus.NOT_FOUND)
                     .body("Usuario no encontrado: " + e.getMessage());
         } catch (Exception e) {
+            log.error("Error al eliminar usuario ID {}: {}", id, e.getMessage(), e);
             return ResponseEntity
                     .status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Error al eliminar usuario: " + e.getMessage());
@@ -293,17 +419,22 @@ public class AdminController {
     }
 
     /**
-     * Banea a un usuario
+     * Suspende (banea) a un usuario.
+     *
+     * @param id ID del usuario a banear
+     * @return Resultado de la operación
      */
     @PutMapping("/banUser/{id}")
     public ResponseEntity<?> banUser(@PathVariable Integer id) {
         try {
+            log.info("Suspendiendo usuario ID: {}", id);
             User user = userRepository.findById(id)
                     .orElseThrow(() -> new NoSuchElementException("Usuario no encontrado con ID: " + id));
 
             // Cambiar estado a "baneado" (0)
             user.setState("0");
             User updatedUser = userRepository.save(user);
+            log.info("Usuario ID {} suspendido exitosamente", id);
 
             Map<String, Object> response = new HashMap<>();
             response.put("id", updatedUser.getId());
@@ -313,10 +444,12 @@ public class AdminController {
 
             return ResponseEntity.ok(response);
         } catch (NoSuchElementException e) {
+            log.warn("Usuario no encontrado al intentar suspender: ID {}", id);
             return ResponseEntity
                     .status(HttpStatus.NOT_FOUND)
                     .body("Usuario no encontrado: " + e.getMessage());
         } catch (Exception e) {
+            log.error("Error al suspender usuario ID {}: {}", id, e.getMessage(), e);
             return ResponseEntity
                     .status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Error al banear usuario: " + e.getMessage());
@@ -324,17 +457,22 @@ public class AdminController {
     }
 
     /**
-     * Desbanea a un usuario
+     * Restaura (desbanea) a un usuario suspendido.
+     *
+     * @param id ID del usuario a desbanear
+     * @return Resultado de la operación
      */
     @PutMapping("/unbanUser/{id}")
     public ResponseEntity<?> unbanUser(@PathVariable Integer id) {
         try {
+            log.info("Reactivando usuario ID: {}", id);
             User user = userRepository.findById(id)
                     .orElseThrow(() -> new NoSuchElementException("Usuario no encontrado con ID: " + id));
 
             // Cambiar estado a "activo" (1)
             user.setState("1");
             User updatedUser = userRepository.save(user);
+            log.info("Usuario ID {} reactivado exitosamente", id);
 
             Map<String, Object> response = new HashMap<>();
             response.put("id", updatedUser.getId());
@@ -344,10 +482,12 @@ public class AdminController {
 
             return ResponseEntity.ok(response);
         } catch (NoSuchElementException e) {
+            log.warn("Usuario no encontrado al intentar reactivar: ID {}", id);
             return ResponseEntity
                     .status(HttpStatus.NOT_FOUND)
                     .body("Usuario no encontrado: " + e.getMessage());
         } catch (Exception e) {
+            log.error("Error al reactivar usuario ID {}: {}", id, e.getMessage(), e);
             return ResponseEntity
                     .status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Error al desbanear usuario: " + e.getMessage());
@@ -355,11 +495,15 @@ public class AdminController {
     }
 
     /**
-     * Obtiene usuarios por rol
+     * Obtiene usuarios filtrados por rol.
+     *
+     * @param roleId ID del rol para filtrar
+     * @return Lista de usuarios con el rol especificado
      */
     @GetMapping("/getUsersByRole/{roleId}")
     public ResponseEntity<?> getUsersByRole(@PathVariable Integer roleId) {
         try {
+            log.info("Obteniendo usuarios con rol ID: {}", roleId);
             // Verificar si el rol existe
             Role role = roleRepository.findById(roleId)
                     .orElseThrow(() -> new NoSuchElementException("Rol no encontrado con ID: " + roleId));
@@ -368,6 +512,7 @@ public class AdminController {
             List<User> users = userRepository.findByRole(role);
 
             if (users.isEmpty()) {
+                log.warn("No se encontraron usuarios con rol ID: {}", roleId);
                 return ResponseEntity
                         .status(HttpStatus.NO_CONTENT)
                         .header("X-Info", "No se encontraron usuarios con el rol especificado")
@@ -388,12 +533,15 @@ public class AdminController {
                 listaContent.add(userContent);
             }
 
+            log.debug("Se encontraron {} usuarios con rol ID: {}", users.size(), roleId);
             return ResponseEntity.ok(listaContent);
         } catch (NoSuchElementException e) {
+            log.warn("Rol no encontrado: ID {}", roleId);
             return ResponseEntity
                     .status(HttpStatus.NOT_FOUND)
                     .body("Rol no encontrado: " + e.getMessage());
         } catch (Exception e) {
+            log.error("Error al obtener usuarios por rol ID {}: {}", roleId, e.getMessage(), e);
             return ResponseEntity
                     .status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Error al obtener usuarios por rol: " + e.getMessage());
