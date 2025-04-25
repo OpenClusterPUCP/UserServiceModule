@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -53,6 +54,8 @@ public class AdminController {
         this.passwordEncoder = passwordEncoder;
         this.flavorRepository = flavorRepository;
     }
+
+    DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss");
 
     /**
      * Obtiene todos los usuarios del sistema.
@@ -94,6 +97,8 @@ public class AdminController {
                 userContent.put("role", user.getRole().getName());
                 userContent.put("code", user.getCode());
                 userContent.put("state", user.getState());
+                userContent.put("createdAt", user.getCreatedAt().format(formatter));
+                userContent.put("lastLogin", user.getLastLogin().format(formatter));
                 listaContent.add(userContent);
             }
 
@@ -149,6 +154,8 @@ public class AdminController {
             response.put("role", user.getRole().getName());
             response.put("roleId", user.getRole().getId());
             response.put("state", user.getState());
+            response.put("createdAt", user.getCreatedAt());
+            response.put("lastLogin", user.getLastLogin());
 
             log.debug("Usuario ID {} recuperado: {}", id, user.getUsername());
             return ResponseEntity.ok(response);
@@ -226,6 +233,7 @@ public class AdminController {
             newUser.setCode((String) userData.get("code"));
             newUser.setRole(role);
             newUser.setState(userData.containsKey("state") ? (String) userData.get("state") : "1");
+            newUser.setCreatedAt(LocalDateTime.now());
 
             // Guardar el usuario
             User savedUser = userRepository.save(newUser);
@@ -240,6 +248,7 @@ public class AdminController {
             response.put("code", savedUser.getCode());
             response.put("role", savedUser.getRole().getName());
             response.put("state", savedUser.getState());
+            response.put("createdAt", savedUser.getCreatedAt());
             response.put("message", "Usuario creado exitosamente");
 
             // Solo incluir la contraseña generada en la respuesta si se generó automáticamente
