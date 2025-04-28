@@ -39,4 +39,7 @@ public class Flavor {
     @OneToMany(mappedBy = "flavor")
     private Set<VirtualMachine> virtualMachines = new LinkedHashSet<>();
 
+    @Column(name="state" , nullable = false)
+    private String state;
+
 }

@@ -33,4 +33,7 @@ public class Image {
     @OneToMany(mappedBy = "image")
     private Set<VirtualMachine> virtualMachines = new LinkedHashSet<>();
 
+    @Column(name="state", nullable = false)
+    private String state;
+
 }

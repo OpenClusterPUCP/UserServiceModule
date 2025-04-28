@@ -17,6 +17,8 @@ import java.util.*;
 
 @RestController
 @Slf4j
+@RequestMapping("/Admin")
+
 public class AdminFlavorController {
     @Autowired
     FlavorRepository flavorRepository;
@@ -61,18 +63,20 @@ public class AdminFlavorController {
             LinkedHashMap<String , Object > json = new LinkedHashMap<>();
             ArrayList<LinkedHashMap<String , Object >> content =  new ArrayList<>();
             for(Flavor f : flavors){
-                LinkedHashMap<String , Object > jsonContent = new LinkedHashMap<>();
-                jsonContent.put("idFlavor" , f.getId());
-                jsonContent.put("name" , f.getName());
-                jsonContent.put("ram" , f.getRam());
-                jsonContent.put("vcpu" , f.getVcpu());
-                jsonContent.put("disk" , f.getDisk());
-                jsonContent.put("type" , f.getType());
-                jsonContent.put("state" , f.getVirtualMachines().isEmpty());
-                content.add(jsonContent);
+                if(f.getState().equals("EXISTE")){
+                    LinkedHashMap<String , Object > jsonContent = new LinkedHashMap<>();
+                    jsonContent.put("idFlavor" , f.getId());
+                    jsonContent.put("name" , f.getName());
+                    jsonContent.put("ram" , f.getRam());
+                    jsonContent.put("vcpu" , f.getVcpu());
+                    jsonContent.put("disk" , f.getDisk());
+                    jsonContent.put("type" , f.getType());
+                    jsonContent.put("state" , f.getVirtualMachines().isEmpty());
+                    content.add(jsonContent);
+                }
             }
-            json.put("content" ,  content);
 
+            json.put("content" ,  content);
             // Si no hay flavors, retornar una lista vacía con código 200 OK
             if (flavors.isEmpty()) {
                 log.info("No flavors found for user ID: {}", userId);
@@ -222,7 +226,7 @@ public class AdminFlavorController {
             flavor.setVcpu(flavorRequest.getVcpu());
             flavor.setDisk(flavorRequest.getDisk());
             flavor.setType(flavorRequest.getType().toLowerCase().trim()); // Guardar el tipo en minúsculas
-
+            flavor.setState("EXISTE");
             // Asignar usuario según el tipo de flavor
             if (!isPublic) {
                 // Buscar el usuario por ID
@@ -352,7 +356,8 @@ public class AdminFlavorController {
             }
 
             // Si el flavor no está siendo utilizado, proceder con la eliminación
-            flavorRepository.delete(flavor);
+            flavor.setState("NO_EXISTE");
+            flavorRepository.save(flavor);
 
             log.info("Successfully deleted flavor with ID: {}", flavorId);
 
