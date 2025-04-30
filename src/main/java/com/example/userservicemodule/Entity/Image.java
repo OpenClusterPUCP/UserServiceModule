@@ -30,10 +30,21 @@ public class Image {
     @JoinColumn(name = "user")
     private User user;
 
-    @OneToMany(mappedBy = "image")
-    private Set<VirtualMachine> virtualMachines = new LinkedHashSet<>();
-
-    @Column(name="state", nullable = false)
+    @Column(name = "state", nullable = false, length = 45)
     private String state;
 
+    @Column(name = "size", nullable = false)
+    private Integer size;
+
+    @Column(name = "so", nullable = false, length = 200)
+    private String so;
+
+    @Column(name = "version", nullable = false, length = 45)
+    private String version;
+
+    @Column(name = "disco", nullable = false, length = 45)
+    private String disco;
+
+    @OneToMany(mappedBy = "image")
+    private Set<VirtualMachine> virtualMachines = new LinkedHashSet<>();
 }
