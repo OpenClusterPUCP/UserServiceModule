@@ -4,6 +4,7 @@ import com.example.userservicemodule.DTO.PasswordResetDTO;
 import com.example.userservicemodule.DTO.PasswordResetRequestDTO;
 import com.example.userservicemodule.DTO.PasswordResetResult;
 import com.example.userservicemodule.DTO.TokenVerificationResult;
+import com.example.userservicemodule.Service.EmailServiceClient;
 import com.example.userservicemodule.Service.UserPasswordService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,12 +14,8 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.util.LinkedMultiValueMap;
-import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.client.RestTemplate;
 
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
@@ -31,15 +28,12 @@ import java.util.Optional;
 public class UserPasswordController {
 
     private final UserPasswordService passwordService;
-    private final RestTemplate restTemplate;
-
-    @Value("${api-gateway.url:http://localhost:8090}")
-    private String apiGatewayUrl;
+    private final EmailServiceClient emailServiceClient;
 
     @Autowired
-    public UserPasswordController(UserPasswordService passwordService, RestTemplate restTemplate) {
+    public UserPasswordController(UserPasswordService passwordService, EmailServiceClient emailServiceClient) {
         this.passwordService = passwordService;
-        this.restTemplate = restTemplate;
+        this.emailServiceClient = emailServiceClient;
     }
 
     /**
@@ -74,21 +68,12 @@ public class UserPasswordController {
             // Obtener información del usuario para personalizar el correo
             String username = passwordService.getUsernameByEmail(request.getEmail());
 
-            // Enviar correo electrónico con el enlace utilizando el EmailServiceModule
+            // Enviar correo electrónico con el enlace utilizando Feign Client
             try {
-                MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
-                params.add("to", request.getEmail());
-                params.add("resetLink", resetLink);
-                if (username != null) {
-                    params.add("username", username);
-                }
-
-                // Enviar la solicitud al servicio de correo
-                ResponseEntity<Map<String, Object>> emailResponse = restTemplate.exchange(
-                        apiGatewayUrl + "/api/email/send/password-reset",
-                        HttpMethod.POST,
-                        new HttpEntity<>(params),
-                        new ParameterizedTypeReference<Map<String, Object>>() {}
+                ResponseEntity<Map<String, Object>> emailResponse = emailServiceClient.sendPasswordResetEmail(
+                        request.getEmail(),
+                        resetLink,
+                        username
                 );
 
                 if (emailResponse.getStatusCode().is2xxSuccessful()) {
@@ -211,18 +196,9 @@ public class UserPasswordController {
             if (result.isSuccess()) {
                 // Notificar al usuario por correo que su contraseña ha sido cambiada
                 try {
-                    MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
-                    params.add("to", result.getEmail());
-                    if (result.getUsername() != null) {
-                        params.add("username", result.getUsername());
-                    }
-
-                    // Enviar la solicitud al servicio de correo
-                    restTemplate.exchange(
-                            apiGatewayUrl + "/api/email/send/password-changed",
-                            HttpMethod.POST,
-                            new HttpEntity<>(params),
-                            new ParameterizedTypeReference<Map<String, Object>>() {}
+                    emailServiceClient.sendPasswordChangedNotification(
+                            result.getEmail(),
+                            result.getUsername()
                     );
 
                     // Continuamos incluso si hay error en el envío del correo
