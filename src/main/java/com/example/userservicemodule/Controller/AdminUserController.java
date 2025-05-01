@@ -16,6 +16,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.time.format.DateTimeFormatter;
@@ -257,21 +259,21 @@ public class AdminUserController {
                 resource.setRam(resourceData.containsKey("ram") ?
                         (Integer) resourceData.get("ram") : 4096);
                 resource.setDisk(resourceData.containsKey("disk") ?
-                        (Integer) resourceData.get("disk") : 30);
+                        new BigDecimal(resourceData.get("disk").toString()) : new BigDecimal("30.00"));
                 resource.setSlices(resourceData.containsKey("slices") ?
                         (Integer) resourceData.get("slices") : 1);
             } else {
                 // Valores por defecto
                 resource.setCpu(4);     // 4 núcleos
                 resource.setRam(4096);  // 4 GB de RAM
-                resource.setDisk(30);   // 30 GB de disco
+                resource.setDisk(new BigDecimal("30.00"));   // 30 GB de disco
                 resource.setSlices(1);  // 1 slice
             }
 
             // Inicializar valores de uso en 0
             resource.setUsedCpu(0);
             resource.setUsedRam(0);
-            resource.setUsedDisk(0);
+            resource.setUsedDisk(new BigDecimal("0.00"));
             resource.setUsedSlices(0);
 
             // Guardar recursos
@@ -665,10 +667,10 @@ public class AdminUserController {
             response.put("disk", resource.getDisk());
             response.put("slices", resource.getSlices());
 
-            // Recursos utilizados
+        // Recursos utilizados
             response.put("usedCpu", resource.getUsedCpu() != null ? resource.getUsedCpu() : 0);
             response.put("usedRam", resource.getUsedRam() != null ? resource.getUsedRam() : 0);
-            response.put("usedDisk", resource.getUsedDisk() != null ? resource.getUsedDisk() : 0);
+            response.put("usedDisk", resource.getUsedDisk() != null ? resource.getUsedDisk() : new BigDecimal("0.00"));
             response.put("usedSlices", resource.getUsedSlices() != null ? resource.getUsedSlices() : 0);
 
             // Calcular porcentajes de uso
@@ -676,8 +678,8 @@ public class AdminUserController {
                     (resource.getUsedCpu() * 100) / resource.getCpu() : 0;
             int ramUsagePercent = resource.getRam() > 0 && resource.getUsedRam() != null ?
                     (resource.getUsedRam() * 100) / resource.getRam() : 0;
-            int diskUsagePercent = resource.getDisk() > 0 && resource.getUsedDisk() != null ?
-                    (resource.getUsedDisk() * 100) / resource.getDisk() : 0;
+            int diskUsagePercent = resource.getDisk().compareTo(BigDecimal.ZERO) > 0 && resource.getUsedDisk() != null ?
+                    resource.getUsedDisk().multiply(new BigDecimal(100)).divide(resource.getDisk(), 0, RoundingMode.HALF_UP).intValue() : 0;
             int slicesUsagePercent = resource.getSlices() > 0 && resource.getUsedSlices() != null ?
                     (resource.getUsedSlices() * 100) / resource.getSlices() : 0;
 
@@ -736,14 +738,14 @@ public class AdminUserController {
                 // Inicializar valores de uso en 0
                 resource.setUsedCpu(0);
                 resource.setUsedRam(0);
-                resource.setUsedDisk(0);
+                resource.setUsedDisk(new BigDecimal("0.00"));
                 resource.setUsedSlices(0);
             }
 
             // Actualizar valores de límites
             resource.setCpu((Integer) resourceData.get("cpu"));
             resource.setRam((Integer) resourceData.get("ram"));
-            resource.setDisk((Integer) resourceData.get("disk"));
+            resource.setDisk(new BigDecimal(resourceData.get("disk").toString()));
             resource.setSlices((Integer) resourceData.get("slices"));
 
             // Actualizar valores de uso si se proporcionan
@@ -754,7 +756,7 @@ public class AdminUserController {
                 resource.setUsedRam((Integer) resourceData.get("usedRam"));
             }
             if (resourceData.containsKey("usedDisk")) {
-                resource.setUsedDisk((Integer) resourceData.get("usedDisk"));
+                resource.setUsedDisk(new BigDecimal(resourceData.get("usedDisk").toString()));
             }
             if (resourceData.containsKey("usedSlices")) {
                 resource.setUsedSlices((Integer) resourceData.get("usedSlices"));
@@ -791,8 +793,8 @@ public class AdminUserController {
                     (savedResource.getUsedCpu() * 100) / savedResource.getCpu() : 0;
             int ramUsagePercent = savedResource.getRam() > 0 && savedResource.getUsedRam() != null ?
                     (savedResource.getUsedRam() * 100) / savedResource.getRam() : 0;
-            int diskUsagePercent = savedResource.getDisk() > 0 && savedResource.getUsedDisk() != null ?
-                    (savedResource.getUsedDisk() * 100) / savedResource.getDisk() : 0;
+            int diskUsagePercent = savedResource.getDisk().compareTo(BigDecimal.ZERO) > 0 && savedResource.getUsedDisk() != null ?
+                    savedResource.getUsedDisk().multiply(new BigDecimal(100)).divide(resource.getDisk(), 0, RoundingMode.HALF_UP).intValue() : 0;
             int slicesUsagePercent = savedResource.getSlices() > 0 && savedResource.getUsedSlices() != null ?
                     (savedResource.getUsedSlices() * 100) / savedResource.getSlices() : 0;
 
@@ -860,7 +862,7 @@ public class AdminUserController {
                 updated = true;
             }
             if (usageData.containsKey("usedDisk")) {
-                resource.setUsedDisk((Integer) usageData.get("usedDisk"));
+                resource.setUsedDisk(new BigDecimal(usageData.get("usedDisk").toString()));
                 updated = true;
             }
             if (usageData.containsKey("usedSlices")) {
@@ -904,8 +906,8 @@ public class AdminUserController {
                     (savedResource.getUsedCpu() * 100) / savedResource.getCpu() : 0;
             int ramUsagePercent = savedResource.getRam() > 0 && savedResource.getUsedRam() != null ?
                     (savedResource.getUsedRam() * 100) / savedResource.getRam() : 0;
-            int diskUsagePercent = savedResource.getDisk() > 0 && savedResource.getUsedDisk() != null ?
-                    (savedResource.getUsedDisk() * 100) / savedResource.getDisk() : 0;
+            int diskUsagePercent = savedResource.getDisk().compareTo(BigDecimal.ZERO) > 0 && savedResource.getUsedDisk() != null ?
+                    savedResource.getUsedDisk().multiply(new BigDecimal(100)).divide(resource.getDisk(), 0, RoundingMode.HALF_UP).intValue() : 0;
             int slicesUsagePercent = savedResource.getSlices() > 0 && savedResource.getUsedSlices() != null ?
                     (savedResource.getUsedSlices() * 100) / savedResource.getSlices() : 0;
 
@@ -967,21 +969,21 @@ public class AdminUserController {
                 resource.setRam(defaultResources.containsKey("ram") ?
                         (Integer) defaultResources.get("ram") : 4096);
                 resource.setDisk(defaultResources.containsKey("disk") ?
-                        (Integer) defaultResources.get("disk") : 30);
+                        new BigDecimal(defaultResources.get("disk").toString()) : new BigDecimal("30.00"));
                 resource.setSlices(defaultResources.containsKey("slices") ?
                         (Integer) defaultResources.get("slices") : 1);
             } else {
                 // Valores por defecto si no se proporcionan
                 resource.setCpu(4);         // 4 CPU
                 resource.setRam(4096);      // 4 GB RAM (en MB)
-                resource.setDisk(30);       // 30 GB de disco
+                resource.setDisk(new BigDecimal("30.00"));  // 30 GB de disco
                 resource.setSlices(1);      // 1 slice
             }
 
             // Inicializar valores de uso en 0
             resource.setUsedCpu(0);
             resource.setUsedRam(0);
-            resource.setUsedDisk(0);
+            resource.setUsedDisk(new BigDecimal("0.00"));
             resource.setUsedSlices(0);
 
             // Guardar recursos
@@ -1070,8 +1072,8 @@ public class AdminUserController {
                         (resource.getUsedCpu() * 100) / resource.getCpu() : 0;
                 int ramUsagePercent = resource.getRam() > 0 && resource.getUsedRam() != null ?
                         (resource.getUsedRam() * 100) / resource.getRam() : 0;
-                int diskUsagePercent = resource.getDisk() > 0 && resource.getUsedDisk() != null ?
-                        (resource.getUsedDisk() * 100) / resource.getDisk() : 0;
+                int diskUsagePercent = resource.getDisk().compareTo(BigDecimal.ZERO) > 0 && resource.getUsedDisk() != null ?
+                        resource.getUsedDisk().multiply(new BigDecimal(100)).divide(resource.getDisk(), 0, RoundingMode.HALF_UP).intValue() : 0;
                 int slicesUsagePercent = resource.getSlices() > 0 && resource.getUsedSlices() != null ?
                         (resource.getUsedSlices() * 100) / resource.getSlices() : 0;
 
@@ -1118,13 +1120,15 @@ public class AdminUserController {
             // Inicializar variables para los recursos requeridos
             Integer requiredCpu = requiredResources.containsKey("cpu") ? (Integer) requiredResources.get("cpu") : 0;
             Integer requiredRam = requiredResources.containsKey("ram") ? (Integer) requiredResources.get("ram") : 0;
-            Integer requiredDisk = requiredResources.containsKey("disk") ? (Integer) requiredResources.get("disk") : 0;
+            BigDecimal requiredDisk = requiredResources.containsKey("disk") ?
+                    new BigDecimal(requiredResources.get("disk").toString()) : BigDecimal.ZERO;
             Integer requiredSlices = requiredResources.containsKey("slices") ? (Integer) requiredResources.get("slices") : 0;
 
             // Calcular recursos disponibles
             Integer availableCpu = resource.getCpu() - (resource.getUsedCpu() != null ? resource.getUsedCpu() : 0);
             Integer availableRam = resource.getRam() - (resource.getUsedRam() != null ? resource.getUsedRam() : 0);
-            Integer availableDisk = resource.getDisk() - (resource.getUsedDisk() != null ? resource.getUsedDisk() : 0);
+            BigDecimal availableDisk = resource.getDisk().subtract(resource.getUsedDisk() != null ?
+                    resource.getUsedDisk() : BigDecimal.ZERO);
             Integer availableSlices = resource.getSlices() - (resource.getUsedSlices() != null ? resource.getUsedSlices() : 0);
 
             // Verificar disponibilidad
@@ -1139,7 +1143,7 @@ public class AdminUserController {
                 isAvailable = false;
                 insufficientResources.add("RAM");
             }
-            if (requiredDisk > availableDisk) {
+            if (requiredDisk.compareTo(availableDisk) > 0) {
                 isAvailable = false;
                 insufficientResources.add("Disk");
             }
@@ -1163,31 +1167,32 @@ public class AdminUserController {
 
             // Incluir detalles de recursos
             Map<String, Object> resourceDetails = new HashMap<>();
-            resourceDetails.put("assigned", new HashMap<String, Integer>() {{
+
+            resourceDetails.put("assigned", new HashMap<String, Object>() {{
                 put("cpu", resource.getCpu());
                 put("ram", resource.getRam());
                 put("disk", resource.getDisk());
                 put("slices", resource.getSlices());
             }});
 
-            resourceDetails.put("used", new HashMap<String, Integer>() {{
+            resourceDetails.put("used", new HashMap<String, Object>() {{
                 put("cpu", resource.getUsedCpu() != null ? resource.getUsedCpu() : 0);
                 put("ram", resource.getUsedRam() != null ? resource.getUsedRam() : 0);
-                put("disk", resource.getUsedDisk() != null ? resource.getUsedDisk() : 0);
+                put("disk", resource.getUsedDisk() != null ? resource.getUsedDisk() : new BigDecimal("0.00")); // BigDecimal
                 put("slices", resource.getUsedSlices() != null ? resource.getUsedSlices() : 0);
             }});
 
-            resourceDetails.put("available", new HashMap<String, Integer>() {{
+            resourceDetails.put("available", new HashMap<String, Object>() {{
                 put("cpu", availableCpu);
                 put("ram", availableRam);
-                put("disk", availableDisk);
+                put("disk", availableDisk); // Ahora es BigDecimal
                 put("slices", availableSlices);
             }});
 
-            resourceDetails.put("required", new HashMap<String, Integer>() {{
+            resourceDetails.put("required", new HashMap<String, Object>() {{
                 put("cpu", requiredCpu);
                 put("ram", requiredRam);
-                put("disk", requiredDisk);
+                put("disk", requiredDisk); // Ahora es BigDecimal
                 put("slices", requiredSlices);
             }});
 

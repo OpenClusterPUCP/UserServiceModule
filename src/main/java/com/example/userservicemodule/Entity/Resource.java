@@ -3,6 +3,8 @@ package com.example.userservicemodule.Entity;
 import jakarta.persistence.*;
 import lombok.Data;
 
+import java.math.BigDecimal;
+
 @Entity
 @Data
 @Table(name = "resource")
@@ -18,8 +20,8 @@ public class Resource {
     @Column(name = "ram")
     private Integer ram;
 
-    @Column(name = "disk")
-    private Integer disk;
+    @Column(name = "disk", precision = 10, scale = 2)
+    private BigDecimal disk;
 
     @Column(name = "slices")
     private Integer slices;
@@ -30,8 +32,8 @@ public class Resource {
     @Column(name = "used_ram")
     private Integer usedRam;
 
-    @Column(name = "used_disk")
-    private Integer usedDisk;
+    @Column(name = "used_disk", precision = 10, scale = 2)
+    private BigDecimal usedDisk;
 
     @Column(name = "used_slices")
     private Integer usedSlices;
