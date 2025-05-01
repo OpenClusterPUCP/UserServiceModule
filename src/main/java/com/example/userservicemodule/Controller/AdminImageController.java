@@ -20,6 +20,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -87,6 +88,10 @@ public class AdminImageController {
                     jsonContent.put("path", img.getPath());
                     jsonContent.put("type", img.getType());
                     jsonContent.put("state", img.getState());
+                    jsonContent.put("so", img.getSo());
+                    jsonContent.put("version", img.getVersion());
+                    jsonContent.put("disco", img.getDisco());
+                    jsonContent.put("size", img.getSize());
                     content.add(jsonContent);
                 }
             }
@@ -250,7 +255,11 @@ public class AdminImageController {
             image.setPath(savedFilename); // Guardamos el nombre del archivo generado por el servicio
             image.setType(imageRequest.getType().toLowerCase().trim());
             image.setState("EXISTE");
-
+            image.setDisco((new BigDecimal(imageRequest.getDisco().replace(" GB" , ""))));
+            image.setDescription(imageRequest.getDescription());
+            image.setSo(imageRequest.getOs());
+            image.setSize(imageRequest.getImageSize());
+            image.setVersion(imageRequest.getVersion());
             // Asignar usuario según el tipo de imagen
             if (!isPublic) {
                 // Buscar el usuario por ID

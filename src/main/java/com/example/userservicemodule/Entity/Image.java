@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.math.BigDecimal;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
@@ -41,9 +42,11 @@ public class Image {
 
     @Column(name = "version", nullable = false, length = 45)
     private String version;
+    @Column(name = "description", nullable = false, length = 200)
+    private String description;
 
-    @Column(name = "disco", nullable = false, length = 45)
-    private String disco;
+    @Column(name = "disco", nullable = false)
+    private BigDecimal disco;
 
     @OneToMany(mappedBy = "image")
     private Set<VirtualMachine> virtualMachines = new LinkedHashSet<>();

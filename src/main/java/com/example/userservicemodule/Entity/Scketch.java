@@ -1,6 +1,7 @@
 package com.example.userservicemodule.Entity;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.JdbcTypeCode;
@@ -18,10 +19,12 @@ public class Scketch {
     @Column(name = "id", nullable = false)
     private Integer id;
 
+    @NotNull
     @Column(name = "structure", nullable = false)
     @JdbcTypeCode(SqlTypes.JSON)
     private Map<String, Object> structure;
 
+    @NotNull
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "user", nullable = false)
     private User user;

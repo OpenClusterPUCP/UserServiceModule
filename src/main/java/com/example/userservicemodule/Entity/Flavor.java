@@ -23,7 +23,7 @@ public class Flavor {
     @Column(name = "ram", nullable = false)
     private Integer ram;
 
-    @Column(name = "vcpu", nullable = false)
+    @Column(name = "vcpus", nullable = false)
     private Integer vcpu;
 
     @Column(name = "disk", nullable = false)

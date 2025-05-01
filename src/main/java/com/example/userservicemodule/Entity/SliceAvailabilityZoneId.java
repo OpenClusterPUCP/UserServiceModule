@@ -2,6 +2,7 @@ package com.example.userservicemodule.Entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Embeddable;
+import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.Hibernate;
@@ -14,9 +15,11 @@ import java.util.Objects;
 @Embeddable
 public class SliceAvailabilityZoneId implements Serializable {
     private static final long serialVersionUID = -4791174289935726723L;
+    @NotNull
     @Column(name = "slice", nullable = false)
     private Integer slice;
 
+    @NotNull
     @Column(name = "availability_zone", nullable = false)
     private Integer availabilityZone;
 
