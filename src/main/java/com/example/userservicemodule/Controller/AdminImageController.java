@@ -81,7 +81,7 @@ public class AdminImageController {
             ArrayList<LinkedHashMap<String, Object>> content = new ArrayList<>();
 
             for (Image img : images) {
-                if (img.getState().equals("EXISTE")) {
+                if (img.getState().equals("active")) {
                     LinkedHashMap<String, Object> jsonContent = new LinkedHashMap<>();
                     jsonContent.put("idImage", img.getId());
                     jsonContent.put("name", img.getName());
@@ -92,6 +92,7 @@ public class AdminImageController {
                     jsonContent.put("version", img.getVersion());
                     jsonContent.put("disco", img.getDisco());
                     jsonContent.put("size", img.getSize());
+                    jsonContent.put("description" , img.getDescription());
                     content.add(jsonContent);
                 }
             }
@@ -254,7 +255,7 @@ public class AdminImageController {
             image.setName(imageRequest.getName());
             image.setPath(savedFilename); // Guardamos el nombre del archivo generado por el servicio
             image.setType(imageRequest.getType().toLowerCase().trim());
-            image.setState("EXISTE");
+            image.setState("active");
             image.setDisco((new BigDecimal(imageRequest.getDisco().replace(" GB" , ""))));
             image.setDescription(imageRequest.getDescription());
             image.setSo(imageRequest.getOs());
@@ -375,7 +376,8 @@ public class AdminImageController {
             }
 
             // Eliminar la imagen de la base de datos
-            imageRepository.delete(image);
+            image.setState("inactive");
+            imageRepository.save(image);
 
             log.info("Successfully deleted image with ID: {}", imageId);
 
@@ -409,10 +411,14 @@ public class AdminImageController {
                     .body(new ErrorResponse("Error deleting image: " + e.getMessage()));
         }
     }
-    @PostMapping("/images/update/{imageId}")
+    @PostMapping(value= "/images/update/{imageId}" , consumes = {
+            MediaType.APPLICATION_FORM_URLENCODED_VALUE,
+            MediaType.MULTIPART_FORM_DATA_VALUE
+    })
     public ResponseEntity<?> updateImage(@PathVariable Integer imageId,
-                                         @RequestPart("imageData") ImageRequest imageRequest,
-                                         @RequestPart(value = "file", required = false) MultipartFile file,
+                                         @RequestParam String name,
+                                         @RequestParam(required = false) String description,
+                                         @RequestParam(required = false) String state,
                                          @RequestParam(required = true, value = "idAdmin") Integer adminUserId) {
         // Crear un objeto para las cabeceras HTTP personalizadas
         HttpHeaders headers = new HttpHeaders();
@@ -484,7 +490,7 @@ public class AdminImageController {
             }
 
             // Validar los datos de entrada básicos
-            if (imageRequest.getName() == null || imageRequest.getName().trim().isEmpty()) {
+            if (name == null || name.trim().isEmpty()) {
                 headers.add("X-Error-Type", "VALIDATION_ERROR");
                 headers.add("X-Error-Code", "IMAGE_NAME_REQUIRED");
                 log.error("Validation error: Image name is required");
@@ -494,99 +500,28 @@ public class AdminImageController {
                         .body(new ErrorResponse("Image name is required"));
             }
 
-            // Validar que el campo type esté presente y sea "public" o "private"
-            if (imageRequest.getType() == null || imageRequest.getType().trim().isEmpty()) {
+            // Validar que el estado no sea vacío si está presente
+            if (state != null && state.trim().isEmpty()) {
                 headers.add("X-Error-Type", "VALIDATION_ERROR");
-                headers.add("X-Error-Code", "IMAGE_TYPE_REQUIRED");
-                log.error("Validation error: Image type is required");
+                headers.add("X-Error-Code", "INVALID_IMAGE_STATE");
+                log.error("Validation error: Image state cannot be empty if provided");
                 return ResponseEntity
                         .badRequest()
                         .headers(headers)
-                        .body(new ErrorResponse("Image type is required"));
+                        .body(new ErrorResponse("Image state cannot be empty if provided"));
             }
 
-            // Validar que el tipo sea "public" o "private"
-            String type = imageRequest.getType().trim().toLowerCase();
-            if (!type.equals("public") && !type.equals("private")) {
-                headers.add("X-Error-Type", "VALIDATION_ERROR");
-                headers.add("X-Error-Code", "INVALID_IMAGE_TYPE");
-                log.error("Validation error: Invalid image type: {}. Must be 'public' or 'private'", imageRequest.getType());
-                return ResponseEntity
-                        .badRequest()
-                        .headers(headers)
-                        .body(new ErrorResponse("Invalid image type. Must be 'public' or 'private'"));
+            // Actualizar únicamente los campos solicitados: nombre, descripción y estado
+            image.setName(name);
+
+            // Actualizar la descripción si está presente
+            if (description != null) {
+                image.setDescription(description);
             }
 
-            // Procesar el archivo de imagen si está presente
-            String savedFilename = image.getPath(); // Mantener la ruta existente si no hay nuevo archivo
-            String fileUrl = null;
-
-            if (file != null && !file.isEmpty()) {
-                // Validar tipo de archivo
-                String contentType = file.getContentType();
-                if (contentType == null || !contentType.startsWith("image/")) {
-                    headers.add("X-Error-Type", "VALIDATION_ERROR");
-                    headers.add("X-Error-Code", "INVALID_FILE_TYPE");
-                    log.error("Validation error: Invalid file type. Only image files are allowed.");
-                    return ResponseEntity
-                            .badRequest()
-                            .headers(headers)
-                            .body(new ErrorResponse("Invalid file type. Only image files are allowed."));
-                }
-
-                try {
-                    // Primero, eliminar el archivo anterior si existe
-                    if (image.getPath() != null && !image.getPath().isEmpty()) {
-                        try {
-                            storageFeignService.deleteFile(image.getPath());
-                            log.info("Previous file deleted from storage service: {}", image.getPath());
-                        } catch (Exception e) {
-                            log.warn("Error deleting previous file from storage service: {}", image.getPath(), e);
-                        }
-                    }
-
-                    // Subir el nuevo archivo
-                    Object uploadResponse = storageFeignService.uploadFile(file);
-
-                    // Extraer la información necesaria del resultado
-                    if (uploadResponse instanceof LinkedHashMap) {
-                        LinkedHashMap<String, Object> responseMap = (LinkedHashMap<String, Object>) uploadResponse;
-                        savedFilename = (String) responseMap.get("savedFilename");
-                        fileUrl = (String) responseMap.get("fileUrl");
-                        log.info("New file uploaded successfully to storage service. Saved filename: {}", savedFilename);
-                    } else {
-                        log.warn("Unexpected response format from storage service: {}", uploadResponse);
-                        // Manejar respuesta no esperada
-                    }
-                } catch (Exception e) {
-                    log.error("Error uploading file to storage service", e);
-                    headers.add("X-Error-Type", "SERVER_ERROR");
-                    headers.add("X-Error-Code", "STORAGE_SERVICE_ERROR");
-                    return ResponseEntity
-                            .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                            .headers(headers)
-                            .body(new ErrorResponse("Error uploading file to storage service: " + e.getMessage()));
-                }
-            }
-
-            // Determinar si la imagen será pública o privada
-            boolean isPublic = "public".equals(imageRequest.getType().trim().toLowerCase());
-
-            // Actualizar los datos de la imagen
-            image.setName(imageRequest.getName());
-            image.setPath(savedFilename);
-            image.setType(imageRequest.getType().toLowerCase().trim());
-
-            // Si la imagen va a ser privada, asignarla al usuario que realiza la acción
-            // Si va a ser pública, quitar cualquier asignación de usuario
-            if (!isPublic) {
-                // Asignar la imagen al administrador que está realizando la acción
-                image.setUser(admin);
-                log.info("Updating image to private, assigned to admin user ID: {}", admin.getId());
-            } else {
-                // Es una imagen pública (sin usuario asignado)
-                image.setUser(null);
-                log.info("Updating image to public (no user assigned)");
+            // Actualizar el estado si está presente
+            if (state != null) {
+                image.setState(state);
             }
 
             // Guardar los cambios en la base de datos
@@ -598,10 +533,10 @@ public class AdminImageController {
 
             content.put("idImage", updatedImage.getId());
             content.put("name", updatedImage.getName());
+            content.put("description", updatedImage.getDescription());
             content.put("path", updatedImage.getPath());
             content.put("type", updatedImage.getType());
             content.put("state", updatedImage.getState());
-            content.put("fileUrl", fileUrl); // Incluir la URL del archivo si se ha actualizado
 
             if (updatedImage.getUser() != null) {
                 content.put("userId", updatedImage.getUser().getId());
@@ -614,7 +549,7 @@ public class AdminImageController {
             headers.add("X-Resource-Type", "image");
             headers.add("X-Operation-Result", "UPDATED");
 
-            log.info("Successfully updated image with ID: {}", updatedImage.getId());
+            log.info("Successfully updated image name, description and state with ID: {}", updatedImage.getId());
 
             return ResponseEntity
                     .ok()
@@ -631,4 +566,5 @@ public class AdminImageController {
                     .body(new ErrorResponse("Error updating image: " + e.getMessage()));
         }
     }
+
 }

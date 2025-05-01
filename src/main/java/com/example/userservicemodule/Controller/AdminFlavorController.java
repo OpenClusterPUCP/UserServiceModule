@@ -4,6 +4,7 @@ import com.example.userservicemodule.Beans.ErrorResponse;
 import com.example.userservicemodule.BeansRequest.FlavorRequest;
 import com.example.userservicemodule.Entity.Flavor;
 import com.example.userservicemodule.Entity.User;
+import com.example.userservicemodule.Entity.VirtualMachine;
 import com.example.userservicemodule.Repository.FlavorRepository;
 import com.example.userservicemodule.Repository.UserRepository;
 import lombok.extern.slf4j.Slf4j;
@@ -13,6 +14,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.util.*;
 
 @RestController
@@ -63,7 +65,7 @@ public class AdminFlavorController {
             LinkedHashMap<String , Object > json = new LinkedHashMap<>();
             ArrayList<LinkedHashMap<String , Object >> content =  new ArrayList<>();
             for(Flavor f : flavors){
-                if(f.getState().equals("EXISTE")){
+                if(f.getState().equals("active")){
                     LinkedHashMap<String , Object > jsonContent = new LinkedHashMap<>();
                     jsonContent.put("idFlavor" , f.getId());
                     jsonContent.put("name" , f.getName());
@@ -71,7 +73,13 @@ public class AdminFlavorController {
                     jsonContent.put("vcpu" , f.getVcpu());
                     jsonContent.put("disk" , f.getDisk());
                     jsonContent.put("type" , f.getType());
-                    jsonContent.put("state" , f.getVirtualMachines().isEmpty());
+                    Integer count = 0 ;
+                    for(VirtualMachine vm  : f.getVirtualMachines()){
+                        if(vm.getStatus().equals("running")){
+                           count =  count +1 ;
+                        }
+                    }
+                    jsonContent.put("state" ,! (count>0)  );
                     content.add(jsonContent);
                 }
             }
@@ -153,7 +161,7 @@ public class AdminFlavorController {
                         .body(new ErrorResponse("VCPU must be a positive number"));
             }
 
-            if (flavorRequest.getDisk() == null || flavorRequest.getDisk() <= 0) {
+            if (flavorRequest.getDisk() == null || flavorRequest.getDisk().compareTo(BigDecimal.ZERO) <= 0) {
                 headers.add("X-Error-Type", "VALIDATION_ERROR");
                 headers.add("X-Error-Code", "INVALID_DISK");
 
@@ -226,7 +234,7 @@ public class AdminFlavorController {
             flavor.setVcpu(flavorRequest.getVcpu());
             flavor.setDisk(flavorRequest.getDisk());
             flavor.setType(flavorRequest.getType().toLowerCase().trim()); // Guardar el tipo en minúsculas
-            flavor.setState("EXISTE");
+            flavor.setState("active");
             // Asignar usuario según el tipo de flavor
             if (!isPublic) {
                 // Buscar el usuario por ID
@@ -356,7 +364,7 @@ public class AdminFlavorController {
             }
 
             // Si el flavor no está siendo utilizado, proceder con la eliminación
-            flavor.setState("NO_EXISTE");
+            flavor.setState("inactive");
             flavorRepository.save(flavor);
 
             log.info("Successfully deleted flavor with ID: {}", flavorId);
@@ -529,7 +537,7 @@ public class AdminFlavorController {
                         .body(new ErrorResponse("VCPU must be a positive number"));
             }
 
-            if (flavorRequest.getDisk() == null || flavorRequest.getDisk() <= 0) {
+            if (flavorRequest.getDisk() == null || flavorRequest.getDisk().compareTo(BigDecimal.ZERO) <= 0) {
                 headers.add("X-Error-Type", "VALIDATION_ERROR");
                 headers.add("X-Error-Code", "INVALID_DISK");
 

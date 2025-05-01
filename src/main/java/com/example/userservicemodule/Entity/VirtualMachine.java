@@ -61,4 +61,91 @@ public class VirtualMachine {
     @OneToMany(mappedBy = "vm")
     private Set<Interface> interfaceFields = new LinkedHashSet<>();
 
+    public Integer getId() {
+        return id;
+    }
+
+    public void setId(Integer id) {
+        this.id = id;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public Image getImage() {
+        return image;
+    }
+
+    public void setImage(Image image) {
+        this.image = image;
+    }
+
+    public Flavor getFlavor() {
+        return flavor;
+    }
+
+    public void setFlavor(Flavor flavor) {
+        this.flavor = flavor;
+    }
+
+    public Slice getSlice() {
+        return slice;
+    }
+
+    public void setSlice(Slice slice) {
+        this.slice = slice;
+    }
+
+    public PhysicalServer getPhysicalServer() {
+        return physicalServer;
+    }
+
+    public void setPhysicalServer(PhysicalServer physicalServer) {
+        this.physicalServer = physicalServer;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
+    }
+
+    public Integer getVncPort() {
+        return vncPort;
+    }
+
+    public void setVncPort(Integer vncPort) {
+        this.vncPort = vncPort;
+    }
+
+    public Integer getVncDisplay() {
+        return vncDisplay;
+    }
+
+    public void setVncDisplay(Integer vncDisplay) {
+        this.vncDisplay = vncDisplay;
+    }
+
+    public Integer getQemuPid() {
+        return qemuPid;
+    }
+
+    public void setQemuPid(Integer qemuPid) {
+        this.qemuPid = qemuPid;
+    }
+
+    public Set<Interface> getInterfaceFields() {
+        return interfaceFields;
+    }
+
+    public void setInterfaceFields(Set<Interface> interfaceFields) {
+        this.interfaceFields = interfaceFields;
+    }
 }

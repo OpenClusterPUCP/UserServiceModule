@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.math.BigDecimal;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
@@ -27,7 +28,7 @@ public class Flavor {
     private Integer vcpu;
 
     @Column(name = "disk", nullable = false)
-    private Integer disk;
+    private BigDecimal disk;
 
     @Column(name = "type", nullable = false, length = 45)
     private String type;
