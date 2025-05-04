@@ -20,8 +20,8 @@ public class Slice {
     @Column(name = "name", nullable = false, length = 45)
     private String name;
 
-    @Column(name = "type", nullable = false, length = 45)
-    private String type;
+    //@Column(name = "type", nullable = false, length = 45)
+    //private String type; No existe "type" en Slice
 
     @Column(name = "description", nullable = false, length = 250)
     private String description;
