@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.sql.Timestamp;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
@@ -28,6 +29,17 @@ public class Slice {
 
     @Column(name = "status", nullable = false, length = 45)
     private String status;
+
+    @Column(name = "created_at")
+    private Timestamp createdAt;
+
+    public Timestamp getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(Timestamp createdAt) {
+        this.createdAt = createdAt;
+    }
 
 
 

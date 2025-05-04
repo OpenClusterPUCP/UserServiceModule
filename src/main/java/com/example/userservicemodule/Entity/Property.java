@@ -12,5 +12,4 @@ public class Property {
     @EmbeddedId
     private PropertyId id;
 
-
 }

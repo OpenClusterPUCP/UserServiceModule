@@ -1,9 +1,11 @@
 package com.example.userservicemodule.Controller;
 
 import com.example.userservicemodule.DTO.AvailabilityZoneDTO;
+import com.example.userservicemodule.DTO.ZoneDetails.ZoneDetailDTO;
 import com.example.userservicemodule.Entity.AvailabilityZone;
 import com.example.userservicemodule.Service.AvailabilityZoneService;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -24,6 +26,16 @@ public class AdminAvailabilityZonesController {
     public List<AvailabilityZoneDTO> getAllAvailabilityZones() {
         return availabilityZoneService.getAllZonesDTO();
     }
+
+    @GetMapping("/zone_service/{id}")
+    public ZoneDetailDTO getZoneDetail(@PathVariable Integer id) {
+        return availabilityZoneService.getZoneDetailById(id);
+    }
+
+
+
+
+
 
 
 }
