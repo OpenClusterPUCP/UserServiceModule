@@ -5,7 +5,7 @@ public class PhysicalServerDTO {
     private int id;
     private String hostname;
     private String ip;
-    private String status; // Ej: "Online", "Offline", etc.
+    private String status; // active
     private int totalVcpu;
     private int usedVcpu;
     private int totalRam;
