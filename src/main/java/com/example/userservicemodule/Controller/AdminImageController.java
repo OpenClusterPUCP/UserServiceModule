@@ -4,8 +4,10 @@ import com.example.userservicemodule.Beans.ErrorResponse;
 import com.example.userservicemodule.Beans.ImageRequest;
 import com.example.userservicemodule.Entity.Image;
 import com.example.userservicemodule.Entity.User;
+import com.example.userservicemodule.Entity.VirtualMachine;
 import com.example.userservicemodule.Repository.ImageRepository;
 import com.example.userservicemodule.Repository.UserRepository;
+import com.example.userservicemodule.Repository.VirtualMachineRepository;
 import com.example.userservicemodule.Service.StorageFeignService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.extern.slf4j.Slf4j;
@@ -29,8 +31,9 @@ import java.util.*;
 @RestController
 @Slf4j
 @RequestMapping("/Admin")
-@Tag(name = "Admin Image Management", description = "API para la gestión de imágenes por parte de administradores")
 public class AdminImageController {
+    @Autowired
+    private VirtualMachineRepository virtualMachineRepository;
     @Autowired
     private StorageFeignService storageFeignService;
 
@@ -40,8 +43,7 @@ public class AdminImageController {
     @Autowired
     private UserRepository userRepository;
 
-    @Value("${image.upload.path}")
-    private String imageUploadPath;
+
 
     @GetMapping("/images/list/{userId}")
     public ResponseEntity<?> getUserImages(@PathVariable Integer userId) {
@@ -93,6 +95,17 @@ public class AdminImageController {
                     jsonContent.put("disco", img.getDisco());
                     jsonContent.put("size", img.getSize());
                     jsonContent.put("description" , img.getDescription());
+                    Integer count = 0;
+                    for(VirtualMachine vm : virtualMachineRepository.findAll()){
+                        if(vm.getImage().getId() ==  img.getId()){
+                            count =  count + 1 ;
+                        }
+                    }
+                    if(count>0){
+                        jsonContent.put("show" , false);
+                    }else{
+                        jsonContent.put("show" , true);
+                    }
                     content.add(jsonContent);
                 }
             }

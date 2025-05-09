@@ -229,6 +229,12 @@ public class AdminFlavorController {
 
             // Crear un nuevo objeto Flavor
             Flavor flavor = new Flavor();
+            System.out.println(flavorRequest.getName());
+            System.out.println(flavorRequest.getRam());
+            System.out.println(flavorRequest.getVcpu());
+            System.out.println(flavorRequest.getDisk());
+            System.out.println(flavorRequest.getType());
+
             flavor.setName(flavorRequest.getName());
             flavor.setRam(flavorRequest.getRam());
             flavor.setVcpu(flavorRequest.getVcpu());
