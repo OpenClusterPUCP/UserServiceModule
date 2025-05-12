@@ -14,7 +14,7 @@ public class Resource {
     @Column(name = "id", nullable = false)
     private Integer id;
 
-    @Column(name = "cpu", nullable = false)
+    @Column(name = "vcpus", nullable = false)
     private Integer cpu;
 
     @Column(name = "ram")
@@ -26,7 +26,7 @@ public class Resource {
     @Column(name = "slices")
     private Integer slices;
 
-    @Column(name = "used_cpu")
+    @Column(name = "used_vcpus")
     private Integer usedCpu;
 
     @Column(name = "used_ram")
