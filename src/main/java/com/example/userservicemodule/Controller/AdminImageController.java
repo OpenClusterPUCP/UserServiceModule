@@ -266,7 +266,7 @@ public class AdminImageController {
             // Crear un nuevo objeto Image
             Image image = new Image();
             image.setName(imageRequest.getName());
-            image.setPath(savedFilename); // Guardamos el nombre del archivo generado por el servicio
+            image.setPath("images/" + savedFilename); // Guardamos el nombre del archivo generado por el servicio
             image.setType(imageRequest.getType().toLowerCase().trim());
             image.setState("active");
             image.setDisco((new BigDecimal(imageRequest.getDisco().replace(" GB" , ""))));
