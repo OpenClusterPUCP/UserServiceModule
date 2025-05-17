@@ -16,7 +16,7 @@ public class SliceService {
 
     public List<SliceSummaryDTO> obtenerResumenSlices() {
         String query = """
-            SELECT s.name, u.name AS propietario, s.description AS topologia, 
+            SELECT s.id, s.name, u.name AS propietario, s.description AS topologia, 
                    SUM(f.vcpus) AS totalVcpu, SUM(f.ram) AS totalRam, 
                    s.status
             FROM cloud_v3.slice s
@@ -32,11 +32,12 @@ public class SliceService {
         List<SliceSummaryDTO> lista = new ArrayList<>();
         for (Object[] fila : resultados) {
             SliceSummaryDTO dto = new SliceSummaryDTO();
-            dto.setNombre((String) fila[0]);
-            dto.setPropietario((String) fila[1]);
-            dto.setTopologia((String) fila[2]);
-            dto.setRecursos(fila[3] + " vCPU, " + fila[4] + "GB RAM");
-            dto.setEstado((String) fila[5]);
+            dto.setId(String.valueOf(fila[0]));
+            dto.setNombre((String) fila[1]);
+            dto.setPropietario((String) fila[2]);
+            dto.setTopologia((String) fila[3]);
+            dto.setRecursos(fila[4] + " vCPU, " + fila[5] + "GB RAM");
+            dto.setEstado((String) fila[6]);
             lista.add(dto);
         }
 

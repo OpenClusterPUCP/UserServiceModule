@@ -1,11 +1,20 @@
 package com.example.userservicemodule.DTO.Slices;
 
 public class SliceSummaryDTO {
+    private String id;
     private String nombre;
     private String propietario;
     private String topologia;
     private String recursos;
     private String estado;
+
+    public String getId() {
+        return id;
+    }
+
+    public void setId(String id) {
+        this.id = id;
+    }
 
     public String getNombre() {
         return nombre;
