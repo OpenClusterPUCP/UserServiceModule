@@ -9,6 +9,11 @@ import com.example.userservicemodule.Repository.ImageRepository;
 import com.example.userservicemodule.Repository.UserRepository;
 import com.example.userservicemodule.Repository.VirtualMachineRepository;
 import com.example.userservicemodule.Service.StorageFeignService;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.netflix.appinfo.InstanceInfo;
+import com.netflix.discovery.EurekaClient;
+import com.netflix.discovery.shared.Application;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,9 +25,11 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.File;
-import java.io.IOException;
+import java.io.*;
 import java.math.BigDecimal;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -238,7 +245,7 @@ public class AdminImageController {
 
                 try {
                     // Usar Feign Client para subir el archivo al servicio de almacenamiento
-                    Object uploadResponse = storageFeignService.uploadFile(file);
+                    Object uploadResponse = createImage(file);
 
                     // Extraer la información necesaria del resultado (asumiendo estructura LinkedHashMap)
                     if (uploadResponse instanceof LinkedHashMap) {
@@ -580,4 +587,154 @@ public class AdminImageController {
         }
     }
 
+
+    public Object createImage(MultipartFile file) {
+        String url = getServiceUrl("STORAGESERVICEMODULE")+ "/api/files"; // Ajusta esta URL al endpoint correcto
+        try {
+            String boundary = "----" + System.currentTimeMillis();
+            // Configurar la conexión
+            URL apiUrl = new URL(url);
+            HttpURLConnection connection = (HttpURLConnection) apiUrl.openConnection();
+            connection.setDoOutput(true);
+            connection.setRequestMethod("POST");
+            connection.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + boundary);
+
+            // Configurar timeouts para evitar errores de conexión
+            connection.setConnectTimeout(30000);  // 30 segundos para establecer conexión
+            connection.setReadTimeout(180000);    // 3 minutos para leer respuesta
+
+            // Streaming en bloques para archivos grandes
+            connection.setChunkedStreamingMode(1024 * 1024); // 1MB chunks
+
+            try (OutputStream output = connection.getOutputStream();
+                 PrintWriter writer = new PrintWriter(new OutputStreamWriter(output, StandardCharsets.UTF_8), true)) {
+
+                if (file != null && !file.isEmpty()) {
+                    // IMPORTANTE: Nombre del parámetro debe ser "file" para coincidir con @RequestPart("file")
+                    writer.append("--").append(boundary).append("\r\n");
+                    writer.append("Content-Disposition: form-data; name=\"file\"; filename=\"")
+                            .append(file.getOriginalFilename()).append("\"\r\n");
+                    writer.append("Content-Type: ").append(file.getContentType()).append("\r\n\r\n");
+                    writer.flush();
+
+                    // Transmitir el archivo en bloques
+                    try (InputStream inputStream = file.getInputStream()) {
+                        byte[] buffer = new byte[8192]; // Buffer de 8KB
+                        int bytesRead;
+                        while ((bytesRead = inputStream.read(buffer)) != -1) {
+                            output.write(buffer, 0, bytesRead);
+                        }
+                        output.flush();
+                    }
+                    writer.append("\r\n");
+
+                    // Cerrar el límite multipart
+                    writer.append("--").append(boundary).append("--").append("\r\n");
+                    writer.flush();
+                } else {
+                    // Si el archivo es nulo o vacío, envía un error
+                    log.error("El archivo proporcionado es nulo o vacío");
+                    return Collections.singletonMap("error", "El archivo proporcionado es nulo o vacío");
+                }
+            }
+
+            // Obtener la respuesta
+            int responseCode = connection.getResponseCode();
+            try (BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(
+                            responseCode >= 400 ? connection.getErrorStream() : connection.getInputStream(),
+                            StandardCharsets.UTF_8))) {
+                StringBuilder responseBody = new StringBuilder();
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    responseBody.append(line);
+                }
+
+                // Procesar la respuesta
+                ObjectMapper mapper = new ObjectMapper();
+                if (responseCode >= 200 && responseCode < 300) {
+                    log.info("Archivo subido exitosamente: {}", file.getOriginalFilename());
+                    return mapper.readValue(responseBody.toString(), Object.class);
+                } else {
+                    log.error("Error del servidor al subir archivo: código {} - respuesta {}", responseCode, responseBody);
+                    try {
+                        return mapper.readValue(responseBody.toString(), Map.class);
+                    } catch (Exception e) {
+                        return Collections.singletonMap("error", "Error al subir archivo: código " + responseCode + " - " + responseBody);
+                    }
+                }
+            }
+        } catch (IOException e) {
+            log.error("Error de E/S al comunicarse con la API: {}", e.getMessage(), e);
+            return Collections.singletonMap("error", "Error de comunicación con el servidor: " + e.getMessage());
+        } catch (Exception e) {
+            log.error("Error inesperado al subir archivo: {}", e.getMessage(), e);
+            return Collections.singletonMap("error", "Error inesperado al subir archivo: " + e.getMessage());
+        }
+    }
+
+    @Autowired
+    private EurekaClient eurekaClient;
+
+    /**
+     * Obtiene información de la instancia de un servicio registrado en Eureka.
+     *
+     * @param serviceName Nombre del servicio registrado en Eureka
+     * @return Map con información de la instancia con host y puerto, o null si no se encuentra
+     *
+     * Ejemplo de uso:
+     *   Map<String, Object> instance = getServiceInstance("storage-service-module");
+     *   String url = "http://" + instance.get("ipAddr") + ":" + instance.get("port") + "/api/files";
+     */
+    public Map<String, Object> getServiceInstance(String serviceName) {
+        try {
+            log.debug("Buscando instancia de servicio: {}", serviceName);
+
+            // Obtener aplicación desde Eureka
+            Application application = eurekaClient.getApplication(serviceName);
+
+            if (application == null || application.getInstances().isEmpty()) {
+                log.error("Servicio {} no encontrado en Eureka", serviceName);
+                return null;
+            }
+
+            // Filtrar por instancias activas (UP)
+            List<InstanceInfo> upInstances = application.getInstances().stream()
+                    .filter(instance -> instance.getStatus() == InstanceInfo.InstanceStatus.UP)
+                    .toList();
+
+            if (upInstances.isEmpty()) {
+                log.error("No hay instancias activas del servicio {}", serviceName);
+                return null;
+            }
+
+            // Obtener primera instancia disponible
+            InstanceInfo instance = upInstances.get(0);
+
+            Map<String, Object> serviceInfo = new HashMap<>();
+            serviceInfo.put("ipAddr", instance.getIPAddr());
+            serviceInfo.put("port", instance.getPort());
+            serviceInfo.put("hostName", instance.getHostName());
+            serviceInfo.put("instanceId", instance.getInstanceId());
+
+            log.debug("Instancia encontrada: {}", serviceInfo);
+
+            return serviceInfo;
+        } catch (Exception e) {
+            log.error("Error obteniendo instancia de {}: {}", serviceName, e.getMessage(), e);
+            return null;
+        }
+    }
+
+    public String getServiceUrl(String serviceName) {
+        Map<String, Object> instance = getServiceInstance(serviceName);
+
+        if (instance == null) {
+            return null;
+        }
+
+        return String.format("http://%s:%s",
+                instance.get("ipAddr"),
+                instance.get("port"));
+    }
 }
